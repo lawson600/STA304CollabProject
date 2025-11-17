@@ -1,0 +1,388 @@
+---
+title: ""
+author: "Daniel Biel, Dhruv Modi, Lawson Hung, Saket Sharma, Yasha Gupta"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Install the Survey Package 
+```{r, include = TRUE, message = FALSE, warning = FALSE}
+
+install.packages(c("survey"))
+```
+
+### Load the Required Libraries
+```{r, include = TRUE, message = FALSE, warning = FALSE}
+
+library(mosaic)
+library(tidyverse)
+library(survey)
+library(knitr)
+
+```
+
+### Import the Data File into R
+```{r import data, include = TRUE, message = FALSE, warning = FALSE}
+
+neigbourhood_crime_data <- read.csv("neighbourhood-crime-rates - 4326.csv")
+attach(neigbourhood_crime_data)
+
+```
+
+### Convert Character Variables to Numeric Variables
+```{r Convert Character to Numeric, include = TRUE, message = FALSE, warning = FALSE}
+
+CCHS.Numeric <- CCHS %>% mutate_if(is.character, as.numeric)
+
+```
+
+### Filter Data by Youths Population
+```{r Filter, include = TRUE, message = FALSE, warning = FALSE}
+
+## Filtering by age Range (2 = 15-17, 3 = 18-19, 4 = 20-24, 5 = 25-29)
+
+CCHS.Filtered <- CCHS.Numeric %>% filter(dhhgage > 1 & dhhgage <= 5)
+
+```
+
+### Select Variables and Drop NAs
+```{r Select Variables and Drop NAs, include = TRUE, message = FALSE, warning = FALSE}
+
+CCHS.Subset <- CCHS.Filtered %>% 
+  select(GEN_030, DHH_SEX, dhhgage) %>% 
+  drop_na(GEN_030, DHH_SEX, dhhgage)
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Re-level Data Values
+```{r Re-level Values, include = TRUE, message = FALSE, warning = FALSE}
+
+# Sense of Belonging to Local Community: 
+## Levels: Strong, Weak
+# Gender:
+## Levels: Female, Male
+# Age: 
+## Levels: 15-17, 18-19, 20-24, 25-29
+CCHS.Subset <- CCHS.Subset %>% 
+  mutate(Belonging.Community = case_when(GEN_030 <=2 ~ "Strong",
+                                         GEN_030 >=3 ~ "Weak"), 
+        Gender = case_when(DHH_SEX == 1 ~ "Male", 
+                           DHH_SEX == 2 ~ "Female"),
+        Age = case_when(dhhgage == 2 ~ "15-17",
+                         dhhgage == 3 ~ "18-19",
+                         dhhgage == 4 ~ "20-24",
+                         dhhgage == 5 ~ "25-29"))                            
+attach(CCHS.Subset)
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Make a Pseudo-population
+```{r Pseudo-population, include = TRUE, message = FALSE, warning = FALSE}
+
+# Input your seed number below for reproducibility.
+set.seed(797)
+
+# Take a sample of 5000 rows without replacement.
+# Assume this is population distribution.
+CCHS.pop <- CCHS.Subset[sample(1:nrow(CCHS.Subset), size = 1000, replace = FALSE), ]
+
+# Create a data frame to store the sampling results in. 
+CCHS.pop <- as.data.frame(CCHS.pop)
+
+# Attach the data frame. 
+attach(CCHS.pop)
+
+# Detach the original data frame.
+detach(CCHS.Subset)
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Proportional Allocation
+```{r Proportional Allocation, include = TRUE, message = FALSE, warning = FALSE}
+
+# With proportional allocation, the stratum sample sizes are proportional to 
+# the population stratum sizes Ni. 
+
+# Multiply Ni/N by the sample size.
+ age.pop <- table(Age); age.pop
+
+# Sample size is 100
+n = 100 
+
+# Population size is 1000
+N <- nrow(CCHS.pop); N
+
+# Obtain proportional allocation
+prop.alloc <- n*age.pop/N
+prop.alloc
+
+# Round to nearest integer
+prop.alloc_int <- round(prop.alloc)
+prop.alloc_int
+
+# Check that stratum sample sizes sum to 100
+sum(prop.alloc_int)
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Stratified Random Sample: Using the slice_sample() function from the dplyr package 
+```{r Stratified Sample, include = TRUE, message = FALSE, warning = FALSE}
+
+# Set seed for reproducibility
+set.seed(797)
+
+# Define the number of samples per age
+# Create a vector with the number of samples to draw from each stratum
+# You need to change stratum sizes based on the result of your seed number
+sample_sizes <- c("15-17" = 20, "18-19" = 11, "20-24" = 29, "25-29" = 40)
+
+
+# Perform stratified sampling
+# Starts a pipe (%>%) that takes CCHS.pop as input and applies a series of operations
+strsample <- CCHS.pop %>%
+  # Add original row numbers
+  mutate(row_id = row_number()) %>%
+  # Groups the dataframe by the stratifying variable Age
+  group_by(Age) %>%
+  # group_modify applies a function to each group:
+  # .x is the current group’s data (all rows of that Age)
+  # .y contains the group key (here Age).
+  # slice_sample(.x, n = sample_sizes[.y$sex[1]]) randomly selects exactly 
+  # the correct number of rows from that group according to sample_sizes
+  # slice_sample() automatically samples without replacement by default (replace = FALSE)
+  group_modify(~ slice_sample(.x, n = sample_sizes[.y$Age[1]])) %>%
+  # Removes the grouping, returning a regular dataframe instead of a grouped one
+  ungroup()
+
+attach(strsample)
+
+# Check the sample sizes
+table(strsample$Age)
+
+# Keep the following variables
+strsample <- strsample %>% select(row_id, Age, Belonging.Community)
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Distribution of Sense of Beloning to Local Community
+```{r Sense of Belonging Distn, include = TRUE, message = FALSE, warning = FALSE}
+
+kable(tally(~ Belonging.Community, margin = TRUE, data = strsample))
+
+strsample %>%
+  # count each category
+  count(Belonging.Community) %>%                          
+  mutate(
+    # calculate percentage
+    Percent = n / sum(n) * 100,      
+    # combine count and percent
+    Label = paste0(n, " (", round(Percent, 2), "%)") 
+  ) %>%
+  select(Belonging.Community, Label) %>%
+  kable(
+    col.names = c("Sense", "Count (Percent)"),
+    caption = "Community Belonging"
+  )
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Perception of Sense of Belonging to Local Community by Age
+```{r Sense of Belonging by Age, include = TRUE, message = FALSE, warning = FALSE}
+
+kable(tally(~ Belonging.Community + Age, margin = TRUE, data = strsample))
+
+strsample %>%
+  # count each combination
+  count(Age, Belonging.Community) %>%              
+  group_by(Age) %>%
+  # calculate row percentages
+  mutate(Percent = n / sum(n) * 100) %>%     
+  ungroup() %>%
+  # combine count + percent
+  mutate(Result = paste0(n, " (", round(Percent, 2), "%)")) %>%  
+  select(Age, Belonging.Community, Result) %>%
+  tidyr::pivot_wider(names_from = Belonging.Community,
+                     values_from = Result)  %>%
+  knitr::kable()
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Sense of Belonging to Local Community by Age
+```{r Bar Plot of Sense of Belonging to Local Community by Age, include = TRUE, message = FALSE, warning = FALSE}
+
+strsample %>%
+  # count each combination
+  count(Age, Belonging.Community) %>%                  
+  group_by(Age) %>%
+  # compute conditional percentages
+  mutate(percent = n / sum(n) * 100) %>%         
+  ggplot(aes(x = factor(Age), 
+             y = percent, 
+             fill = factor(Belonging.Community))) +
+  # side-by-side bars
+  geom_col(position = "dodge") +                
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) + 
+  # custom colors
+  scale_fill_manual(
+    values = c("Strong" = "seagreen3", "Weak" = "mediumpurple3")  
+  ) +
+  labs(
+    x = "Age Group",
+    y = "Percent within Age Group",
+    fill = "Sense of Belonging",
+    title = "Sense of Belonging to Local Community by Age"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    # light green background
+    plot.background = element_rect(fill = "honeydew2", color = NA),  
+    # same for panel
+    panel.background = element_rect(fill = "honeydew2", color = NA), 
+    panel.grid.major = element_line(color = "white"),
+    panel.grid.minor = element_blank()
+  )
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Create A Binary Variable for Sense of Belonging to Local Community 
+```{r Create a Binary Variable, include = TRUE, message = FALSE, warning = FALSE}
+
+# Create a variable Sense.Belonging, 
+# replicate 0 n times (number of rows in the sample) (n = 100)
+strsample$Sense.Belonging <- rep(0, nrow(strsample))
+# If Sense.Community in strsample == Strong, assign value 1, otherwise (if Weak), remain 0
+strsample$Sense.Belonging[strsample$Belonging.Community == "Strong"] <- 1
+
+```
+
+### Specify the Survey Design
+```{r Stratified Design, include = TRUE, message = FALSE, warning = FALSE}
+
+# Create a variable containing population stratum sizes, for use in fpc
+strsample <- strsample %>%
+  mutate(
+    # Change the population sizes according to the result from your seed number
+    popsize = case_when(
+      Age == "15-17" ~ 224,
+      Age == "18-19" ~ 109,
+      Age == "20-24" ~ 270,
+      Age == "25-29" ~ 397
+    ))
+
+
+# Check the result
+strsample %>%
+  count(Age, popsize)
+
+# Input design information for strsample
+# Use svydesign() function in survey package
+# Use ~1 for id argument to indicate no clusters
+# strata argument gives the variable name(s) containing the stratification information
+# here, the stratification variable is age
+# fcp argument specifies the variable that contains information for calculating 
+# the finite population correction (fcp) in each stratum.
+stratified.design <- svydesign(id = ~1, strata = ~Age, fpc = ~popsize, 
+                               data = strsample)
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Calculate Proportion, SE and Confidence Interval
+```{r Estimate Population Proportion, include = TRUE, message = FALSE, warning = FALSE}
+
+est.prop <- svymean(~Sense.Belonging, stratified.design)
+est.prop
+confint(est.prop)
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Calculate Total, SE and Confidence Interval
+```{r Estimate Population Total, include = TRUE, message = FALSE, warning = FALSE}
+
+est.total <- svytotal(~Sense.Belonging, stratified.design)
+est.total
+confint(est.total)
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Alternative Way to Calculate Estimated Proportion and Total
+```{r Alterantive Way, include = TRUE, message = FALSE, warning = FALSE}
+
+# Create a factor variable sense.belonging
+strsample$sense.belonging <- factor(strsample$Sense.Belonging)
+
+# Return the svydesign because the data set has a new variable
+stratified.design <- svydesign(id = ~1, strata = ~Gender, fpc = ~popsize, 
+                               data = strsample)
+
+# Calculate Proportion, SE and Confidence Interval
+est.prop <- svymean(~sense.belonging, stratified.design)
+est.prop
+confint(est.prop)
+
+# Calculate Total, SE and Confidence Interval
+est.total <- svytotal(~sense.belonging, stratified.design)
+est.total
+confint(est.total)
+
+```
+
+```{r, results='asis', eval=(opts_knit$get('rmarkdown.pandoc.to') == 'latex'), echo = FALSE}
+cat('\\pagebreak')
+```
+
+### Calculate Stratum Statistics
+```{r Stratum Statistics, include = TRUE, message = FALSE, warning = FALSE}
+
+est.prop.age <- svyby(~sense.belonging, by = ~Age, stratified.design, svymean, keep.var = TRUE)
+est.prop.age
+confint(est.prop.age)
+
+```
