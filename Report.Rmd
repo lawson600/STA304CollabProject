@@ -5,15 +5,21 @@ date: "`r Sys.Date()`"
 output: pdf_document
 ---
 
-```{r Setup, include=FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 install.packages(c("survey"))
 library(mosaic)
 library(tidyverse)
 library(survey)
+library(broom)
 library(knitr)
 crime <- read.csv("neighbourhood-crime-rates - 4326.csv")
 attach(crime)
+knitr::opts_chunk$set(
+  echo=FALSE,
+  warming=FALSE
+  
+)
 ```
 
 \newpage  # Introduction
@@ -45,7 +51,7 @@ Data was originally published on September 18, 2020 by Toronto Police Services, 
 
 To examine how assault, robbery, and auto theft rates vary across Toronto neighbourhoods in 2023, we created a subset of the dataset containing only the 2023 crime variables. This allowed us to focus specifically on neighbourhood-level variation for these three crime types. The 2023 data reveal substantial variation across neighbourhoods for all crimes studied. 
 
-```{r Question 1 Figure 1, echo=FALSE,message = FALSE, warning = FALSE} 
+```{r Question 1 Figure 1, echo=FALSE,message = FALSE, warning = FALSE, fig.cap="Assault Rate by Toronto Neighbourhood (2023)"} 
 crime_2023 <- crime %>%
   select(AREA_NAME, ASSAULT_2023, ROBBERY_2023, AUTOTHEFT_2023)
 ggplot(crime_2023, aes(x = reorder(AREA_NAME, ASSAULT_2023), y = ASSAULT_2023)) +
@@ -187,7 +193,7 @@ Figure 3 displays the strongest change among the three crimes. Auto theft rates 
 To investigate whether assault rates can be predicted using time or other crime types, we fitted two regression models. The first model examined whether assault rates changed over time by regressing assault rates on Year alone. 
 
 
-```{r Qestion 3 Figure 1, echo = FALSE,message = FALSE, warning = FALSE}
+```{r Question 3 Figure 1, echo = FALSE,message = FALSE, warning = FALSE}
 # Need to get R code for
 combined <- assault_long %>%
   left_join(robbery_long, by = c("AREA_NAME", "Year")) %>%
@@ -209,13 +215,43 @@ model_crime <- lm(AssaultRate ~ RobberyRate + AutoTheftRate, data = combined)
 summary(model_crime)
 ```
 
+
 The second model used robbery rates and auto theft rates as predictors of assault. The regression output shows that robbery rate is strongly associated with assault rate: for every one-unit increase in robbery, assault increases by about 3.7 units, and this effect is highly significant. Auto theft shows a very small negative coefficient, which is statistically significant only because of the extremely large sample size and is not practically meaningful. This model has an R² of approximately 0.484, meaning robbery and auto theft together explain about 48% of the variation in assault rates—a much stronger model than the time-only model. The high F-statistic confirms that the crime-based model is highly significant overall.
 
 Taken together, the results show that while assault rates do not meaningfully change over time, they are strongly linked to other violent crime levels in a neighbourhood. Robbery, in particular, is a strong predictor of assault, whereas auto theft adds very little explanatory power. Therefore, a regression model using other crime types, especially robbery, is much more effective at predicting assault rates than a model using time alone.
 
 \newpage # Conclusion
 
+This project examined crime patterns across Toronto neighbourhoods using data from the City of Toronto’s Neighbourhood Crime Rates dataset (2014-2024). Across our three research questions, we identified clear spatial and temporal trends in assault, robbery, and auto theft, and evaluated the extent to which these crimes can be predicted using regression models.
+
+Our first research question focused on variation across neighbourhoods in 2023. The results show substantial differences in crime levels across the city. Assault, robbery, and auto theft rates were not evenly distributed; rather, certain neighbourhoods consistently exhibited higher crime levels across multiple categories. Auto theft displayed the widest spread, with a long right-tail indicating that crime was heavily concentrated in a small number of neighbourhoods. These findings demonstrate that crime in Toronto is geographically uneven and that certain areas experience disproportionate levels of criminal activity.
+
+The second research question examined trends from 2014 to 2024. Assault rates remained relatively stable over the ten-year period, with only minor fluctuations. Robbery rates showed a gradual decline from 2014 until approximately 2020, followed by a slight increase after 2021. Auto theft exhibited the most notable change, rising sharply beginning around 2018 and increasing more dramatically in the final years of the dataset. These results highlight that crime types do not follow the same long-term trajectory; some remain steady while others experience significant growth or decline.
+
+The third research question investigated whether assault rates could be predicted using time (Year) or other crime types. The time-only regression model showed a small but statistically significant upward trend in assault rates; however, the model’s explanatory power was extremely weak, with an R² value of approximately 0.018. In contrast, the model incorporating robbery and auto theft rates explained nearly half of the variation in assault levels. Robbery emerged as a strong and meaningful predictor of assault, while auto theft contributed very little practical explanatory value despite statistical significance. These findings suggest that temporal changes do not meaningfully predict assault, but cross-crime relationships within neighbourhoods provide a much stronger basis for understanding variation in assault rates.
+
+## Limitations
+
+Although the dataset is rich and detailed, several limitations of the dataset and methodology should be considered when interpreting these results. 
+
+ - **Neighbourhood-level aggregation**: Crime data is aggregated at the neighbourhood level, which may mask variation within neighbourhoods and limit the precision of the analysis.
+ - **Lack of demographic or socioeconomic variables**: The dataset contains crime rates only and does not include factors such as income, population density, policing presence, or housing characteristics. Without these contextual variables, our models cannot fully explain why crime varies across space and time.
+ - **Missing or irregular values**: Although missing values were left as-is rather than imputed, this may slightly reduce model accuracy. Additionally, zero crime entries may represent either genuinely low crime or reporting/measurement gaps.
+ - **Observational constraints**: The dataset provides correlational, not causal, insights. We cannot determine whether robbery causes higher assault rates or whether both arise from shared underlying conditions.
+Annual data granularity: Crime is measured yearly. Monthly or seasonal trends cannot be explored with this dataset.
+
+## Future Directions
+
+There are several promising opportunities to extend this work in future analyses. Incorporating demographic and socioeconomic variables, such as income, education levels, unemployment rates, or housing characteristics, would provide additional explanatory power and help clarify the structural factors contributing to crime patterns. Spatial analysis methods, including mapping crime clusters or measuring spatial autocorrelation, could offer deeper insight into the geographic dynamics of crime across Toronto.
+
+More advanced modelling approaches, such as random forests or gradient boosting, may capture nonlinear relationships and interactions that linear models cannot detect. Access to more granular temporal data (monthly or seasonal) would allow for the analysis of short-term fluctuations, post-pandemic changes, or seasonality in crime patterns. Additional crime categories from the dataset could also be explored to determine whether similar patterns of clustering or co-occurrence exist among other types of offences.
+
+Finally, connecting the dataset with external policy or policing information, such as community safety initiatives, neighbourhood revitalization programs, or shifts in police resource allocation, could help contextualize observed trends and provide more meaningful interpretations for real-world applications.
+
+
 \newpage # Appendix
 
-```{r all-code, ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE, fig.cap='--- Code Chunk: \\1 ---'}
-# This chunk collects and displays the code from other chunks.
+```{r, ref.label="Question 1 Figure 1", echo = TRUE, eval = FALSE}
+
+```
+
