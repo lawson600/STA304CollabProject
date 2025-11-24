@@ -18,15 +18,23 @@ attach(crime)
 knitr::opts_chunk$set(
   echo=FALSE,
   warming=FALSE
-  
 )
+theme_set(theme_minimal(base_family = "Times New Roman"))
 ```
+
+\newpage  # Abstract  
+
+<!--Insert   -->
 
 \newpage  # Introduction
 
-**Crime Patterns Across Toronto Neighbourhoods** uses the Neighborhood Crime Rates dataset published by the City of Toronto’s Open Data Portal. The dataset contains 158 neighborhood-level observations and 203 variables covering a 10 year period from 2014 to 2024. Each neighborhood has annual crime counts (# unique) as well as rate values (per 100,000 population) for Assault, Auto Theft, Break and Enter, Robbery, Theft Over, Homicide and Shooting & Firearm Discharges.
+**Crime Patterns Across Toronto Neighbourhoods** uses the Neighborhood Crime Rates dataset published by the City of Toronto’s Open Data Portal. The dataset contains 158 neighborhood-level observations and 203 variables covering a 10 year period from 2014 to 2024. Each neighborhood has annual crime counts (# unique) as well as rate values (per 100,000 population) for Assault, Auto Theft, Break and Enter, Robbery, Theft Over, Homicide and Shooting & Firearm Discharges. In this report we intend to answer:
 
-Data was originally published on September 18, 2020 by Toronto Police Services, refreshed and refreshed annually. The dataset was last refreshed on June 30, 2025. The dataset includes:
+ 1. How do assault, robbery, and auto theft rates vary across Toronto neighbourhoods in 2023?
+ 2. How have these crime types changed over time from 2014 to 2024?
+ 3.Can a regression model predict assault rates using time (year) or other crime types as predictors?
+
+Data was originally published on September 18, 2020 by Toronto Police Services, refreshed and refreshed annually. The data set was last refreshed on June 30, 2025. The data set includes:
 
  - **Geographic Unit**: 158 Officially defined Toronto neighborhoods
  - **Temporal Coverage**: 2014-2024
@@ -47,56 +55,109 @@ Data was originally published on September 18, 2020 by Toronto Police Services, 
  1. Reshaping Crime data into time-series format: Reorganized data so that each neighborhood has multiple rows; one row per year, instead of one column per year. This made it easier to plot changes across years and run regression models
  2. Handling Missing Values: Any missing values in the crime rates were kept null rather than being filled in or estimated. Additionally, no zeroes were replaced or modified, a zero is treated as a real observed value.
 
-\newpage # 1. How do assault, robbery, and auto theft rates vary across Toronto neighbourhoods in 2023?
+\newpage # Results 1
 
 To examine how assault, robbery, and auto theft rates vary across Toronto neighbourhoods in 2023, we created a subset of the dataset containing only the 2023 crime variables. This allowed us to focus specifically on neighbourhood-level variation for these three crime types. The 2023 data reveal substantial variation across neighbourhoods for all crimes studied. 
 
-```{r Question 1 Figure 1, echo=FALSE,message = FALSE, warning = FALSE, fig.cap="Assault Rate by Toronto Neighbourhood (2023)"} 
+```{r Figure 1, echo=FALSE,message = FALSE, warning = FALSE, fig.cap="Assault Rate by Toronto Neighbourhood (2023)"} 
 crime_2023 <- crime %>%
   select(AREA_NAME, ASSAULT_2023, ROBBERY_2023, AUTOTHEFT_2023)
-ggplot(crime_2023, aes(x = reorder(AREA_NAME, ASSAULT_2023), y = ASSAULT_2023)) +
+
+regions <- list(
+  "Old Toronto" = c(1,2,3,4,5,6,38,39,40,41,42,43,44,54,55,56,57,
+                    58,59,60,61,62,63,64,65,66,67,79,80,81,82,83,
+                    84,85,86,87,88,89,90,91,92,93,94,99,100,101,102,
+                    103,104,105,106),
+  Scarborough   = c(7,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,
+                    31,32,33,34,35,36,37,68,69,70,71,72,49),
+  "North York"  = c(8,9,10,
+                    11,12,13,14,107,108,109,110,111,112,113,114,115,
+                    116,117,118,119,120,121,122,123,124,125,126,127,
+                    132,133,134,135,136,155,156),
+  Etioboke   = c(157,158,45,46,47,48,137,138,139,140,141,142,143,144,
+                 145,146,147,148,149,150,151,152,153,154),
+  York   = c(50,51,52,53,73,74,75,76,77,78),
+  "East York"  = c(95,96,97,98,128,129,130,131)
+)
+
+filtered_regions <- lapply(regions, function(ids) {
+  crime %>% filter(X_id %in% ids)
+})
+
+mean_assault <- sapply(filtered_regions, function(df) {
+  mean(df$ASSAULT_RATE_2023)
+})
+
+mean_df <- data.frame(
+  regions = names(mean_assault),
+  MeanAssault = mean_assault
+)
+
+ggplot(mean_df, aes(x = regions, y = MeanAssault)) +
   geom_col(fill = "steelblue") +
   coord_flip() +
   theme_minimal() +
   labs(
-    title = "Assault Rates by Toronto Neighbourhood (2023)",
-    x = "Neighbourhood",
+    #title = "Assault Rates by Toronto Region (2023)",
+    x = "Region",
     y = "Assault Rate per 100,000"
-    )
+  )
 ```
 
 Figure 1 shows the distribution of assault rates across Toronto’s 156 neighbourhoods. The bar chart ranks neighbourhoods from lowest to highest assault rates, clearly showing that some neighbourhoods experience much higher levels of assault than others. The long right tail of the graph indicates a small group of neighbourhoods with particularly high assault rates, while many others cluster near the lower and middle ranges.
 
-```{r Question 1 Figure 2, echo=FALSE,message = FALSE, warning = FALSE}
-ggplot(crime_2023, aes(x = reorder(AREA_NAME, ROBBERY_2023), y = ROBBERY_2023)) +
-  geom_col(fill = "firebrick") +
+\newpage
+
+```{r Figure 2, echo=FALSE,message = FALSE, warning = FALSE, fig.cap="Robbery Rate by Toronto Neighbourhood (2023)"} 
+mean_robbery <- sapply(filtered_regions, function(df) {
+  mean(df$ROBBERY_RATE_2023, na.rm = TRUE)
+})
+
+mean_df <- data.frame(
+  regions = names(mean_robbery),
+  MeanRobbery = mean_robbery
+)
+
+ggplot(mean_df, aes(x = regions, y = MeanRobbery)) +
+  geom_col(fill = "firebrick1") +
   coord_flip() +
   theme_minimal() +
   labs(
-    title = "Robbery Rates by Toronto Neighbourhood (2023)",
-    x = "Neighbourhood",
-    y = "Robbery Rate per 100,000"
+    #title = "Robbery Rates by Toronto Region (2023)",
+    x = "Region",
+    y = "Robbery per 100,000"
   )
 ```
 
 Figure 2 displays a similar ranking for robbery rates in 2023. Compared to assault, robbery rates are lower overall but still show noticeable variation between neighbourhoods. A few neighbourhoods stand out with distinctly higher robbery levels, indicating localized hotspots, while most neighbourhoods fall within a moderate or low range. The pattern suggests that robbery tends to be more concentrated geographically than assault.
 
-```{r Qeustion 1 Figure 3, echo=FALSE,message = FALSE, warning = FALSE}
-ggplot(crime_2023, aes(x = reorder(AREA_NAME, AUTOTHEFT_2023), y = AUTOTHEFT_2023)) +
+\newpage  
+
+```{r Figure 3, echo=FALSE,message = FALSE, warning = FALSE, fig.cap="Autotheft Rate by Toronto Region (2023)" }
+mean_autotheft <- sapply(filtered_regions, function(df) {
+  mean(df$AUTOTHEFT_RATE_2023)
+})
+
+mean_df <- data.frame(
+  regions = names(mean_autotheft),
+  MeanAutoTheft = mean_autotheft
+)
+
+ggplot(mean_df, aes(x = regions, y = MeanAutoTheft)) +
   geom_col(fill = "darkorange") +
   coord_flip() +
   theme_minimal() +
   labs(
-    title = "Auto Theft Rates by Toronto Neighbourhood (2023)",
-    x = "Neighbourhood",
-    y = "Auto Theft Rate per 100,000"
+    #title = "Autotheft Rates by Toronto Region (2023)",
+    x = "Region",
+    y = "Autotheft Rate per 100,000"
   )
 
 ```
 
 Figure 3 highlights auto theft rates by neighbourhood and shows the largest spread among the three crime types. Auto theft rates vary dramatically, with some neighbourhoods showing extremely high levels relative to the rest of the city. The long upper-tail of the distribution suggests that auto theft is heavily concentrated in certain areas. Compared to assault and robbery, auto theft exhibits the most uneven spatial distribution across Toronto.
 
-```{r Question 1 Figure 4, include=TRUE, echo=FALSE,message = FALSE, warning = FALSE}
+```{r setup2, include=FALSE, echo=FALSE,message = FALSE, warning = FALSE, fig.cap="Robbery Rate by Toronto Neighbourhood (2023)"} 
 crimes2023 <- c(crime_2023$ASSAULT_2023,
                 crime_2023$ROBBERY_2023,
                 crime_2023$AUTOTHEFT_2023)
@@ -107,14 +168,13 @@ for (crimedata in crimes2023){
 }
 ```
 
-
 To complement these graphs, we examined the summary statistics for each crime type, as shown in figure 4. Assault rates ranged widely, robbery rates were generally lower with a smaller spread, and auto theft rates showed the highest maximum values and the widest distribution. Together, the bar charts and summary statistics demonstrate that crime levels in Toronto are not evenly distributed. Some neighbourhoods consistently appear near the top across multiple crime categories, suggesting localized areas with higher criminal activity. Overall, 2023 data show clear differences in assault, robbery, and auto theft patterns, with each crime type having distinct levels of concentration and variability across neighbourhoods.
 
-\newpage # 2. How have these crime types changed over time from 2014 to 2024?
+\newpage # Results 2
 
 To examine how crime has changed over time, we reshaped the dataset into long format and plotted annual trends for assault, robbery, and auto theft across Toronto neighbourhoods from 2014 to 2024. 
 
-```{r Question 2 Figure 1, echo=FALSE,message = FALSE, warning = FALSE}
+```{r Figure 4, echo=FALSE,message = FALSE, warning = FALSE, fig.cap="Assuault Rates per Year for each Neighbourhood" }
 assault_long <- crime %>%
   select(AREA_NAME, starts_with("ASSAULT_")) %>%
   pivot_longer(
@@ -124,23 +184,24 @@ assault_long <- crime %>%
   ) %>%
   mutate(Year = as.numeric(str_replace(Year, "ASSAULT_", "")))
 #kable later
-head(assault_long)
 ggplot(assault_long, aes(x = Year, y = AssaultRate)) +
   geom_line(aes(group = AREA_NAME), alpha = 0.15, color = "grey50") +
   stat_summary(fun = mean, geom = "line", color = "blue", size = 1.5) +
   coord_cartesian(ylim = c(0, 1000)) +
   theme_minimal() +
   labs(
-    title = "Assault Rate Trends in Toronto (2014–2024)",
+    #title = "Assault Rate Trends in Toronto (2014–2024)",
     x = "Year",
     y = "Assault Rate"
   )
 
 ```
 
-Figure 1 shows that assault rates have remained relatively stable over the ten-year period. Most neighbourhoods fall within a low-to-moderate range, and the city-wide average line is nearly flat, indicating no major long-term increase or decrease. 
+Figure 4 shows that assault rates have remained relatively stable over the ten-year period. Most neighbourhoods fall within a low-to-moderate range, and the city-wide average line is nearly flat, indicating no major long-term increase or decrease. 
 
-```{r Question 2 Figure 2, echo = FALSE,message = FALSE, warning = FALSE}
+\newpage
+
+```{r Figure 5, echo = FALSE,message = FALSE, warning = FALSE, fig.cap="Robbery Rates per Year for each Neighbourhood" }
 robbery_long<- crime %>%
   select(AREA_NAME, starts_with("ROBBERY_")) %>%
   pivot_longer(
@@ -155,16 +216,17 @@ ggplot(robbery_long, aes(x = Year, y = RobberyRate)) +
   coord_cartesian(ylim = c(0, 200)) +
   theme_minimal() +
   labs(
-    title = "Robbery Rate Trends in Toronto (2014–2024)",
+    #title = "Robbery Rate Trends in Toronto (2014–2024)",
     x = "Year",
     y = "Robbery Rate"
   )
-
 ```
 
-Figure 2 reveals that robbery rates are consistently lower than assault and show a gradual decline from 2014 to roughly 2020, followed by a slight rise after 2021. Most neighbourhoods remain below 50 robberies per 100,000, suggesting robbery became less common overall but may be increasing again in recent years. 
+Figure 5 reveals that robbery rates are consistently lower than assault and show a gradual decline from 2014 to roughly 2020, followed by a slight rise after 2021. Most neighbourhoods remain below 50 robberies per 100,000, suggesting robbery became less common overall but may be increasing again in recent years. 
 
-```{r Qestion 2Figure 3, echo=FALSE,message = FALSE, warning = FALSE}
+\newpage 
+
+```{r Figure 6, echo=FALSE,message = FALSE, warning = FALSE, fig.cap="Auto Theft per Year for each Neighbourhood"}
 autotheft_long<- crime %>%
   select(AREA_NAME, starts_with("AUTOTHEFT_")) %>%
   pivot_longer(
@@ -179,40 +241,52 @@ ggplot(autotheft_long, aes(x = Year, y = AutoTheftRate)) +
   coord_cartesian(ylim = c(0, 800)) +
   theme_minimal() +
   labs(
-    title = "Auto Theft Rate Trends in Toronto (2014–2024)",
+    #title = "Auto Theft Rate Trends in Toronto (2014–2024)",
     x = "Year",
     y = "Auto Theft Rate"
   )
 
 ```
 
-Figure 3 displays the strongest change among the three crimes. Auto theft rates begin rising noticeably around 2018, and the city-wide average increases sharply in the final years of the dataset. More neighbourhoods also show higher auto theft levels, indicating that auto theft has grown into a significant and expanding issue across Toronto. Collectively, the trends show that while assault has stayed stable and robbery has mildly declined, auto theft has increased substantially, especially after 2018, highlighting a major shift in crime patterns over the last decade.
+Figure 6 displays the strongest change among the three crimes. Auto theft rates begin rising noticeably around 2018, and the city-wide average increases sharply in the final years of the dataset. More neighbourhoods also show higher auto theft levels, indicating that auto theft has grown into a significant and expanding issue across Toronto. Collectively, the trends show that while assault has stayed stable and robbery has mildly declined, auto theft has increased substantially, especially after 2018, highlighting a major shift in crime patterns over the last decade.
 
-\newpage # 3. Can we build a regression model to predict assault rates using time (year) or other crime types as predictors?
+\newpage # Results 3
 
-To investigate whether assault rates can be predicted using time or other crime types, we fitted two regression models. The first model examined whether assault rates changed over time by regressing assault rates on Year alone. 
+To investigate whether assault rates can be predicted using time or other crime types, we fitted two regression models. The first model examined whether assault rates changed over time by using a linear regression for assault rates by year alone. 
 
 
-```{r Question 3 Figure 1, echo = FALSE,message = FALSE, warning = FALSE}
-# Need to get R code for
-combined <- assault_long %>%
-  left_join(robbery_long, by = c("AREA_NAME", "Year")) %>%
-  left_join(autotheft_long, by = c("AREA_NAME", "Year"))
-#Need to convert to KABLE
-model_crime <- lm(AssaultRate ~ RobberyRate + AutoTheftRate, data = combined)
-summary(model_crime)
+```{r Figure 7, echo = FALSE,message = FALSE, warning = FALSE, fig.cap="Regression on Assault Rate per Year" }
+model_crime <- lm(AssaultRate ~ Year, data = assault_long)
+statistics <- tidy(model_crime)
+statswithr <- rbind(statistics, data.frame(
+  term = "$R^2$",
+  estimate = summary(model_crime)$r.squared,
+  std.error = NA,
+  statistic = NA,
+  p.value = NA
+  )
+)
+kable(statswithr)
 ```
 
 The output shows a small positive slope of approximately +4.37, indicating a slight upward trend over the 2014–2024 period. Although this trend is statistically significant due to the large number of observations, the model has a very low R² of about 0.018, meaning Year explains only 1.8% of the variation in assault rates. This demonstrates that time alone is a very weak predictor and that assault levels remain relatively stable over the decade.
 
 
-```{r Question 3 Figure 2, echo = FALSE,message = FALSE, warning = FALSE}
+```{r Figure 8,echo = FALSE,message = FALSE, warning = FALSE, fig.cap="Regression on Robbery and Auto theft for Assault" }
 combined <- assault_long %>%
   left_join(robbery_long, by = c("AREA_NAME", "Year")) %>%
   left_join(autotheft_long, by = c("AREA_NAME", "Year"))
-#Need to convert to KABLE
 model_crime <- lm(AssaultRate ~ RobberyRate + AutoTheftRate, data = combined)
-summary(model_crime)
+statistics <- tidy(model_crime)
+statswithr <- rbind(statistics, data.frame(
+  term = "$R^2$",
+  estimate = summary(model_crime)$r.squared,
+  std.error = NA,
+  statistic = NA,
+  p.value = NA
+  )
+)
+kable(statswithr)
 ```
 
 
@@ -251,7 +325,34 @@ Finally, connecting the dataset with external policy or policing information, su
 
 \newpage # Appendix
 
-```{r, ref.label="Question 1 Figure 1", echo = TRUE, eval = FALSE}
+**Setup**
+```{r, ref.label="setup", echo = TRUE, eval = FALSE}```
 
-```
+**Figure 1**
+```{r, ref.label="Figure 1", echo = TRUE, eval = FALSE}```
 
+
+**Figure 2**
+```{r, ref.label="Figure 2", echo = TRUE, eval = FALSE}```
+
+
+**Figure 3**
+```{r, ref.label="Figure 3", echo = TRUE, eval = FALSE}```
+
+**Setup 2**
+```{r, ref.label="Setup 2", echo = TRUE, eval = FALSE}```
+
+**Figure 4**
+```{r, ref.label="Figure 4", echo = TRUE, eval = FALSE}```
+
+**Figure 5**
+```{r, ref.label="Figure 5", echo = TRUE, eval = FALSE}```
+
+**Figure 6**
+```{r, ref.label="Figure 6", echo = TRUE, eval = FALSE}```
+
+**Figure 7**
+```{r, ref.label="Figure 7", echo = TRUE, eval = FALSE}```
+
+**Figure 8**
+```{r, ref.label="Figure 8", echo = TRUE, eval = FALSE}```
