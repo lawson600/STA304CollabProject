@@ -32,7 +32,7 @@ theme_set(theme_minimal(base_family = "Times New Roman"))
 
  1. How do assault, robbery, and auto theft rates vary across Toronto neighbourhoods in 2023?
  2. How have these crime types changed over time from 2014 to 2024?
- 3.Can a regression model predict assault rates using time (year) or other crime types as predictors?
+ 3. Can a regression model predict assault rates using time (year) or other crime types as predictors?
 
 Data was originally published on September 18, 2020 by Toronto Police Services, refreshed and refreshed annually. The data set was last refreshed on June 30, 2025. The data set includes:
 
